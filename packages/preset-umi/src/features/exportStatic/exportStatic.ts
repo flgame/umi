@@ -39,17 +39,20 @@ function isHtmlRoute(route: IRoute): boolean {
   return false;
 }
 function getHtmlPath(path: string, htmlSuffix: boolean): string {
-  if(!path) return path;
+  if (!path) return path;
   if (path === '/*') return '/404.html';
   if (path === '/') return '/index.html';
-  
+
   if (path.endsWith('/')) path = path.slice(0, -1);
   return htmlSuffix ? `${path}.html` : `${path}/index.html`;
 }
 /**
  * get export html data from routes
  */
-function getExportHtmlData(routes: Record<string, IRoute>, htmlSuffix: boolean): IExportHtmlItem[] {
+function getExportHtmlData(
+  routes: Record<string, IRoute>,
+  htmlSuffix: boolean,
+): IExportHtmlItem[] {
   const map = new Map<string, IExportHtmlItem>();
 
   Object.values(routes).forEach((route) => {
@@ -188,18 +191,23 @@ export default (api: IApi) => {
       let publicPathStr = JSON.stringify(api.config.publicPath);
       // handle relative publicPath, such as `./`
       if (publicPath.startsWith('.') || api.config.exportStatic?.dynamicRoot) {
+        routerBaseStr = `location.pathname.split('/').slice(0, -${Math.max(
+          route.path.split('/').length - 1,
+          1,
+        )}).concat('').join('/')`;
+        publicPathStr = `location.protocol + '//' + location.hostname + (location.port ? ':' + location.port : '') + window.routerBase`;
         assert(
           api.config.runtimePublicPath,
           '`runtimePublicPath` should be enable when `publicPath` is relative!',
         );
 
         const rltPrefix = relative(dirname(file), '.');
-        const joinRltPrefix = (path:string) => {
-          if(!rltPrefix || rltPrefix == '.') {
-            return winPath(`.${path.startsWith('/') ? '' : sep}${path}`)
+        const joinRltPrefix = (path: string) => {
+          if (!rltPrefix || rltPrefix == '.') {
+            return winPath(`.${path.startsWith('/') ? '' : sep}${path}`);
           }
           return winPath(join(rltPrefix, path));
-        }
+        };
         // prefix for all assets
         if (rltPrefix) {
           // HINT: clone for keep original markupArgs unmodified
@@ -252,7 +260,9 @@ export default (api: IApi) => {
       }
 
       markupArgs.headScripts = markupArgs.headScripts || [];
-      markupArgs.headScripts.unshift(`window.routerBase = ${routerBaseStr};window.publicPath = ${publicPathStr}`);
+      markupArgs.headScripts.unshift(
+        `window.routerBase = ${routerBaseStr};window.publicPath = ${publicPathStr}`,
+      );
       // append html file
       const htmlContent = await getMarkup({
         ...markupArgs,
@@ -278,7 +288,7 @@ export default (api: IApi) => {
     } = api.config;
     const extraHtmlData = getExportHtmlData(
       await getRoutesFromUserExtraPaths(extraRoutePaths),
-      htmlSuffix
+      htmlSuffix,
     );
     const htmlData = getExportHtmlData(api.appData.routes, htmlSuffix).concat(
       extraHtmlData,
@@ -318,7 +328,9 @@ export function modifyContextOpts(memo: any) {
     });
   });
   api.modifyRoutes((routes: Record<string, IRoute>) => {
-    const { exportStatic: { htmlSuffix = false }} = api.config;
+    const {
+      exportStatic: { htmlSuffix = false },
+    } = api.config;
     // copy / to /index.html and /xxx to /xxx.html or /xxx/index.html
     Object.keys(routes).forEach((key) => {
       const route = routes[key];
@@ -327,7 +339,7 @@ export function modifyContextOpts(memo: any) {
         routes[key] = {
           ...route,
           path: getHtmlPath(route.path, htmlSuffix),
-        }
+        };
       }
     });
   });

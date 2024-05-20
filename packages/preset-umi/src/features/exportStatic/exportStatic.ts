@@ -1,7 +1,7 @@
 import { getMarkup } from '@umijs/server';
 import { lodash, logger, Mustache, winPath } from '@umijs/utils';
 import assert from 'assert';
-import { dirname, join, relative, sep } from 'path';
+import { dirname, join, relative } from 'path';
 import type { IApi, IRoute } from '../../types';
 import { absServerBuildPath } from '../ssr/utils';
 
@@ -204,7 +204,7 @@ export default (api: IApi) => {
         const rltPrefix = relative(dirname(file), '.');
         const joinRltPrefix = (path: string) => {
           if (!rltPrefix || rltPrefix == '.') {
-            return winPath(`.${path.startsWith('/') ? '' : sep}${path}`);
+            return `.${path.startsWith('/') ? '' : '/'}${path}`;
           }
           return winPath(join(rltPrefix, path));
         };
@@ -261,7 +261,7 @@ export default (api: IApi) => {
 
       markupArgs.headScripts ||= [];
       markupArgs.headScripts.unshift(
-        `window.routerBase = ${routerBaseStr};window.publicPath = ${publicPathStr}`,
+        `window.routerBase = ${routerBaseStr};if(null == window.publicPath) window.publicPath = ${publicPathStr}`,
       );
       // append html file
       const htmlContent = await getMarkup({

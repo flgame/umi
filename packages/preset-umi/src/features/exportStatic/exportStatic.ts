@@ -259,7 +259,7 @@ export default (api: IApi) => {
         }
       }
 
-      markupArgs.headScripts = markupArgs.headScripts || [];
+      markupArgs.headScripts ||= [];
       markupArgs.headScripts.unshift(
         `window.routerBase = ${routerBaseStr};window.publicPath = ${publicPathStr}`,
       );

@@ -23,6 +23,12 @@ export default function HomePage() {
       <Link to="/page1.html">
         <h2>Page 1(/page1.html)</h2>
       </Link>
+      <Link to="/page1/page1_1">
+        <h2>Page 1-1(/page1/page1_1)</h2>
+      </Link>
+      <Link to="/page1/page1_1.html">
+        <h2>Page 1-1(/page1/page1_1.html)</h2>
+      </Link>
     </div>
   );
 }

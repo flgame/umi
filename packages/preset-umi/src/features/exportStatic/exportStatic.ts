@@ -149,8 +149,8 @@ export default (api: IApi) => {
       schema: ({ zod }) =>
         zod
           .object({
-            htmlSuffix: zod.boolean().default(false),
-            dynamicRoot: zod.boolean().default(false),
+            htmlSuffix: zod.boolean(),
+            dynamicRoot: zod.boolean(),
             extraRoutePaths: zod.union([
               zod.function(),
               zod.array(zod.string()),
@@ -198,7 +198,7 @@ export default (api: IApi) => {
         publicPathStr = `location.protocol + '//' + location.hostname + (location.port ? ':' + location.port : '') + window.routerBase`;
         assert(
           api.config.runtimePublicPath,
-          '`runtimePublicPath` should be enable when `publicPath` is relative!',
+          '`runtimePublicPath` should be enable when `publicPath` is relative or `exportStatic.dynamicRoot` is true!',
         );
 
         const rltPrefix = relative(dirname(file), '.');
@@ -261,7 +261,12 @@ export default (api: IApi) => {
 
       markupArgs.headScripts ||= [];
       markupArgs.headScripts.unshift(
-        `window.routerBase = ${routerBaseStr};if(null == window.publicPath) window.publicPath = ${publicPathStr}`,
+        `window.routerBase = ${routerBaseStr};`,
+        `
+if(!window.publicPath) {
+  window.publicPath = ${publicPathStr};
+}
+        `,
       );
       // append html file
       const htmlContent = await getMarkup({
@@ -284,7 +289,7 @@ export default (api: IApi) => {
 
   api.onGenerateFiles(async () => {
     const {
-      exportStatic: { extraRoutePaths = [], htmlSuffix = false },
+      exportStatic: { extraRoutePaths = [], htmlSuffix },
     } = api.config;
     const extraHtmlData = getExportHtmlData(
       await getRoutesFromUserExtraPaths(extraRoutePaths),
@@ -329,7 +334,7 @@ export function modifyContextOpts(memo: any) {
   });
   api.modifyRoutes((routes: Record<string, IRoute>) => {
     const {
-      exportStatic: { htmlSuffix = false },
+      exportStatic: { htmlSuffix },
     } = api.config;
     // copy / to /index.html and /xxx to /xxx.html or /xxx/index.html
     Object.keys(routes).forEach((key) => {

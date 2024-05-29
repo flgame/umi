@@ -191,15 +191,14 @@ export default (api: IApi) => {
       let publicPathStr = JSON.stringify(api.config.publicPath);
       // handle relative publicPath, such as `./`
       if (publicPath.startsWith('.') || api.config.exportStatic?.dynamicRoot) {
-        routerBaseStr = `location.pathname.split('/').slice(0, -${Math.max(
-          route.path.split('/').length - 1,
-          1,
-        )}).concat('').join('/')`;
-        publicPathStr = `location.protocol + '//' + location.hostname + (location.port ? ':' + location.port : '') + window.routerBase`;
         assert(
           api.config.runtimePublicPath,
           '`runtimePublicPath` should be enable when `publicPath` is relative or `exportStatic.dynamicRoot` is true!',
         );
+
+        const pathN = Math.max(route.path.split('/').length - 1, 1);
+        routerBaseStr = `location.pathname.split('/').slice(0, -${pathN}).concat('').join('/')`;
+        publicPathStr = `location.protocol + '//' + location.hostname + (location.port ? ':' + location.port : '') + window.routerBase`;
 
         const rltPrefix = relative(dirname(file), '.');
         const joinRltPrefix = (path: string) => {

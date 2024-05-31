@@ -168,14 +168,18 @@ export default (api: IApi) => {
 
   // export routes to html files
   api.modifyExportHTMLFiles(async (_defaultFiles, opts) => {
-    const { publicPath } = api.config;
+    const {
+      publicPath,
+      base,
+      exportStatic: { htmlSuffix, dynamicRoot },
+    } = api.config;
     const htmlData = api.appData.exportHtmlData;
     const htmlFiles: { path: string; content: string }[] = [];
     const { markupArgs: defaultMarkupArgs } = opts;
     let asyncMarkupArgs: typeof defaultMarkupArgs;
 
     for (const { file, route, prerender } of htmlData) {
-      let markupArgs = defaultMarkupArgs;
+      let markupArgs = { ...defaultMarkupArgs };
 
       // mark async for the scripts of pre-rendered html
       if (api.config.ssr && prerender) {
@@ -187,16 +191,30 @@ export default (api: IApi) => {
           ),
         };
       }
-      let routerBaseStr = JSON.stringify(api.config.base);
-      let publicPathStr = JSON.stringify(api.config.publicPath);
-      // handle relative publicPath, such as `./`
-      if (publicPath.startsWith('.') || api.config.exportStatic?.dynamicRoot) {
+      let routerBaseStr = JSON.stringify(base || '/');
+      let publicPathStr = JSON.stringify(publicPath || '/');
+      // handle relative publicPath, such as `./`, same with dynamicRoot
+      if (publicPath.startsWith('.') || dynamicRoot) {
         assert(
           api.config.runtimePublicPath,
           '`runtimePublicPath` should be enable when `publicPath` is relative or `exportStatic.dynamicRoot` is true!',
         );
 
-        const pathN = Math.max(route.path.split('/').length - 1, 1);
+        let pathS = route.path;
+        const isSlash = pathS.endsWith('/');
+        if (pathS === '/404') {
+          //do nothing
+        }
+        // keep the relative path same for route /xxx and /xxx.html
+        else if (htmlSuffix && isSlash) {
+          pathS = pathS.slice(0, -1);
+        }
+        // keep the relative path same for route /xxx/ and /xxx/index.html
+        else if (!htmlSuffix && !isSlash) {
+          pathS = pathS + '/';
+        }
+
+        const pathN = Math.max(pathS.split('/').length - 1, 1);
         routerBaseStr = `location.pathname.split('/').slice(0, -${pathN}).concat('').join('/')`;
         publicPathStr = `location.protocol + '//' + location.hostname + (location.port ? ':' + location.port : '') + window.routerBase`;
 
@@ -208,65 +226,60 @@ export default (api: IApi) => {
           return winPath(join(rltPrefix, path));
         };
         // prefix for all assets
-        if (rltPrefix) {
-          // HINT: clone for keep original markupArgs unmodified
-          const picked = lodash.cloneDeep(
-            lodash.pick(markupArgs, [
-              'favicons',
-              'links',
-              'styles',
-              'headScripts',
-              'scripts',
-            ]),
-          );
+        // HINT: clone for keep original markupArgs unmodified
+        const picked = lodash.cloneDeep(
+          lodash.pick(markupArgs, [
+            'favicons',
+            'links',
+            'styles',
+            'headScripts',
+            'scripts',
+          ]),
+        );
 
-          // handle favicons
-          picked.favicons.forEach((item: string, i: number) => {
-            if (item.startsWith(publicPath)) {
-              picked.favicons[i] = joinRltPrefix(item);
-            }
-          });
+        // handle favicons
+        picked.favicons.forEach((item: string, i: number) => {
+          if (item.startsWith(publicPath)) {
+            picked.favicons[i] = joinRltPrefix(item);
+          }
+        });
 
-          // handle links
-          picked.links.forEach((link: { href: string }) => {
-            if (link.href?.startsWith(publicPath)) {
-              link.href = joinRltPrefix(link.href);
-            }
-          });
+        // handle links
+        picked.links.forEach((link: { href: string }) => {
+          if (link.href?.startsWith(publicPath)) {
+            link.href = joinRltPrefix(link.href);
+          }
+        });
 
-          // handle scripts
-          [picked.headScripts, picked.scripts, picked.styles].forEach(
-            (group: ({ src: string } | string)[]) => {
-              group.forEach((script, i) => {
-                if (
-                  typeof script === 'string' &&
-                  script.startsWith(publicPath)
-                ) {
-                  group[i] = joinRltPrefix(script);
-                } else if (
-                  typeof script === 'object' &&
-                  script.src?.startsWith(publicPath)
-                ) {
-                  script.src = joinRltPrefix(script.src);
-                }
-              });
-            },
-          );
+        // handle scripts
+        [picked.headScripts, picked.scripts, picked.styles].forEach(
+          (group: ({ src: string } | string)[]) => {
+            group.forEach((script, i) => {
+              if (typeof script === 'string' && script.startsWith(publicPath)) {
+                group[i] = joinRltPrefix(script);
+              } else if (
+                typeof script === 'object' &&
+                script.src?.startsWith(publicPath)
+              ) {
+                script.src = joinRltPrefix(script.src);
+              }
+            });
+          },
+        );
 
-          // update markupArgs
-          markupArgs = Object.assign({}, markupArgs, picked);
-        }
+        picked.headScripts.unshift(
+          `window.routerBase = ${routerBaseStr};`,
+          `
+if(!window.publicPath) {
+window.publicPath = ${publicPathStr};
+}
+          `,
+        );
+
+        // update markupArgs
+        markupArgs = Object.assign({}, markupArgs, picked);
       }
 
-      markupArgs.headScripts ||= [];
-      markupArgs.headScripts.unshift(
-        `window.routerBase = ${routerBaseStr};`,
-        `
-if(!window.publicPath) {
-  window.publicPath = ${publicPathStr};
-}
-        `,
-      );
       // append html file
       const htmlContent = await getMarkup({
         ...markupArgs,
@@ -316,7 +329,7 @@ export function modifyClientRenderOpts(memo: any) {
 export function modifyContextOpts(memo: any) {
   return {
     ...memo,
-    basename: window.routerBase,
+    basename: window.routerBase || memo.basename,
   }
 }
       `.trim(),

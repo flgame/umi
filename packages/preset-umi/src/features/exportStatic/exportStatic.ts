@@ -179,7 +179,7 @@ export default (api: IApi) => {
     let asyncMarkupArgs: typeof defaultMarkupArgs;
 
     for (const { file, route, prerender } of htmlData) {
-      let markupArgs = { ...defaultMarkupArgs };
+      let markupArgs = defaultMarkupArgs;
 
       // mark async for the scripts of pre-rendered html
       if (api.config.ssr && prerender) {
